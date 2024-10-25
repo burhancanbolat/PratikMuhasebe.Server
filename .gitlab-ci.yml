@@ -1,0 +1,50 @@
+include:
+  - project: 'pratik-tools/ci'
+    ref: 'main'
+    file: '/k8s-deployment.yml'
+
+stages:
+  - build
+  - publish
+  - push
+  - deploy
+
+variables:
+  DOCKER_IMAGE: registry.pratikislem.com.tr/muhasebe/mikromuhasebe
+
+before_script:
+  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+
+build:
+  stage: build
+  image: registry.pratikislem.com.tr/pratik-tools/dotnet-image:sdk-8.0
+  script:
+    - dotnet publish "./PratikMuhasebe.Server/PratikMuhasebe.Server.csproj" -c Release -o publish
+  artifacts:
+    paths:
+      - publish
+
+publish:
+  stage: publish
+  image: registry.pratikislem.com.tr/pratik-tools/dotnet-image:aspnet-8.0
+  script:
+    - docker build -t $DOCKER_IMAGE:$CI_COMMIT_SHA .
+
+push:
+  stage: push
+  image: registry.pratikislem.com.tr/pratik-tools/dotnet-image:aspnet-8.0
+  script:
+    - docker push $DOCKER_IMAGE:$CI_COMMIT_SHA
+  only:
+    - development
+    - stage
+    - production
+
+deploy:
+  stage: deploy
+  variables:
+    DOCKER_IMAGE_NAME: "$DOCKER_IMAGE:$CI_COMMIT_SHA"
+  only:
+    - development
+    - stage
+    - production
